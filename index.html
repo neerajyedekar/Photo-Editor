@@ -1,0 +1,1082 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>
+:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;font:14px system-ui,-apple-system,"Segoe UI",sans-serif}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<title>Darkroom</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<style>
+/* Layout: a fixed viewing stage above a tabbed control deck; side-by-side once there's room. Dark by design — a neutral surround is how you judge an image. */
+:root{
+  --bg:#131110;
+  --deck:#1b1917;
+  --sink:#0c0a09;
+  --line:#2f2a26;
+  --fg:#efe9e1;
+  --muted:#988f86;
+  --accent:#e3a455;
+  --accent-ink:#1a1310;
+  --warn:#c9654a;
+  --gl:max(16px, env(safe-area-inset-left,0px));
+  --gr:max(16px, env(safe-area-inset-right,0px));
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--fg);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:14px;line-height:1.45;-webkit-text-size-adjust:100%;
+  overscroll-behavior:none;
+}
+button{font:inherit;color:inherit}
+h1,h2,h3{margin:0;text-wrap:balance}
+
+.app{display:flex;flex-direction:column;height:100%;min-height:0}
+
+/* ---- top bar ---- */
+.bar{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding-block:10px;padding-left:var(--gl);padding-right:var(--gr);
+  background:var(--deck);border-bottom:1px solid var(--line);
+}
+.brand{display:flex;align-items:baseline;gap:10px;min-width:0;flex:1}
+.brand b{
+  font-family:"IBM Plex Sans Condensed",system-ui,sans-serif;
+  font-weight:600;font-size:17px;letter-spacing:.06em;text-transform:uppercase;
+}
+.brand b .dot{color:var(--accent)}
+.file{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11.5px;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;
+}
+.bar-actions{display:flex;gap:8px;flex:0 0 auto}
+
+/* ---- buttons ---- */
+.btn{
+  border:1px solid var(--line);background:#231f1c;border-radius:4px;
+  padding:7px 12px;cursor:pointer;white-space:nowrap;
+  font-family:"IBM Plex Sans Condensed",system-ui,sans-serif;
+  font-weight:500;letter-spacing:.04em;text-transform:uppercase;font-size:12.5px;
+}
+.btn:hover{border-color:#453d37;background:#2a2522}
+.btn.key{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.key:hover{background:#efb268;border-color:#efb268}
+.btn.ghost{background:transparent}
+.btn:focus-visible,.chip:focus-visible,.tab:focus-visible,input:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px
+}
+
+/* ---- work area ---- */
+.work{display:flex;flex-direction:column;flex:1;min-height:0}
+.stage{
+  flex:1 1 42%;min-height:170px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:10px;
+  background:var(--sink);padding-block:14px;padding-left:var(--gl);padding-right:var(--gr);
+  position:relative;
+}
+.frame{position:relative;line-height:0;max-width:100%;max-height:100%}
+#view{display:block;max-width:100%;border-radius:2px;box-shadow:0 10px 34px rgba(0,0,0,.55);touch-action:none}
+.stage.cropping #view{cursor:crosshair}
+.readout{
+  position:absolute;left:var(--gl);bottom:8px;
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10.5px;letter-spacing:.03em;
+  color:var(--muted);font-variant-numeric:tabular-nums;pointer-events:none;
+}
+.drop{
+  position:absolute;inset:6px;border:1.5px dashed var(--accent);border-radius:6px;
+  display:none;align-items:center;justify-content:center;background:rgba(19,17,16,.84);
+  font-family:"IBM Plex Sans Condensed",sans-serif;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--accent);z-index:5;
+}
+.app.dragging .drop{display:flex}
+
+/* ---- control deck ---- */
+.deck{
+  flex:0 1 auto;display:flex;flex-direction:column;min-height:0;
+  background:var(--deck);border-top:1px solid var(--line);
+}
+.tabs{
+  display:flex;gap:2px;padding-left:var(--gl);padding-right:var(--gr);
+  border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none;
+}
+.tabs::-webkit-scrollbar{display:none}
+.tab{
+  background:none;border:0;border-bottom:2px solid transparent;cursor:pointer;
+  padding:11px 12px;color:var(--muted);white-space:nowrap;
+  font-family:"IBM Plex Sans Condensed",system-ui,sans-serif;
+  font-weight:600;font-size:12.5px;letter-spacing:.09em;text-transform:uppercase;
+}
+.tab[aria-selected=true]{color:var(--fg);border-bottom-color:var(--accent)}
+.panes{
+  overflow-y:auto;padding-block:14px 18px;
+  padding-left:var(--gl);padding-right:var(--gr);
+  display:flex;flex-direction:column;gap:14px;
+}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.lbl{
+  font-family:"IBM Plex Sans Condensed",system-ui,sans-serif;
+  font-size:11px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);
+  width:100%;
+}
+.chip{
+  border:1px solid var(--line);background:#231f1c;border-radius:999px;cursor:pointer;
+  padding:6px 12px;font-size:12.5px;font-variant-numeric:tabular-nums;
+}
+.chip:hover{border-color:#453d37}
+.chip[aria-pressed=true]{border-color:var(--accent);color:var(--accent);background:#2a2018}
+.icons{display:flex;gap:8px;flex-wrap:wrap}
+.icons .chip{min-width:44px;display:flex;align-items:center;justify-content:center;border-radius:4px;padding:8px}
+.icons svg{width:17px;height:17px;display:block}
+
+/* sliders */
+.slider{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center}
+.slider .name{
+  font-family:"IBM Plex Sans Condensed",system-ui,sans-serif;
+  font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);
+}
+.slider .val{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11.5px;
+  font-variant-numeric:tabular-nums;color:var(--fg);
+}
+.slider input{grid-column:1/-1;width:100%;accent-color:var(--accent);margin:0}
+.stack{display:flex;flex-direction:column;gap:12px}
+
+/* presets */
+.presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px}
+.pset{
+  border:1px solid var(--line);background:#231f1c;border-radius:4px;cursor:pointer;
+  padding:0;overflow:hidden;text-align:left;min-width:0;
+}
+.pset:hover{border-color:#453d37}
+.pset[aria-pressed=true]{border-color:var(--accent)}
+.pset canvas{display:block;width:100%;height:58px;object-fit:cover;background:#0c0a09}
+.pset span{
+  display:block;padding:6px 8px;font-size:11.5px;
+  font-family:"IBM Plex Sans Condensed",system-ui,sans-serif;
+  letter-spacing:.06em;text-transform:uppercase;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.pset[aria-pressed=true] span{color:var(--accent)}
+
+/* export */
+.num{
+  background:#231f1c;border:1px solid var(--line);border-radius:4px;color:var(--fg);
+  padding:7px 9px;width:104px;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:13px;
+}
+.num.sm{width:78px}
+.times{color:var(--muted);font-family:"IBM Plex Mono",monospace}
+.seg{display:flex;gap:6px}
+.note{font-size:12.5px;color:var(--muted);max-width:62ch}
+.dims{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12.5px;
+  font-variant-numeric:tabular-nums;
+}
+.dims b{color:var(--accent);font-weight:500}
+.saved{min-height:18px;font-size:12.5px;color:var(--accent)}
+.saved.bad{color:var(--warn)}
+#shot{display:none;max-width:100%;border-radius:3px;margin-top:4px}
+#shot.on{display:block}
+.hr{height:1px;background:var(--line);border:0;margin:2px 0}
+
+@media (min-width:860px){
+  .work{flex-direction:row}
+  .stage{flex:1 1 auto;padding-block:20px}
+  .deck{flex:0 0 352px;border-top:0;border-left:1px solid var(--line)}
+  .panes{padding-block:16px 24px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="app" id="app">
+  <header class="bar">
+    <div class="brand">
+      <b>Dark<span class="dot">·</span>room</b>
+      <span class="file" id="fileName">sample-frame.jpg · 1600×1067</span>
+    </div>
+    <div class="bar-actions">
+      <button class="btn ghost" id="openBtn">Open photo</button>
+      <button class="btn key" id="quickExport">Export</button>
+    </div>
+  </header>
+
+  <main class="work">
+    <section class="stage cropping" id="stage">
+      <div class="frame"><canvas id="view" width="10" height="10"></canvas></div>
+      <div class="readout" id="readout"></div>
+      <div class="drop">Drop to load</div>
+    </section>
+
+    <section class="deck">
+      <nav class="tabs" role="tablist">
+        <button class="tab" role="tab" id="t-crop" aria-selected="true">Crop</button>
+        <button class="tab" role="tab" id="t-presets" aria-selected="false">Presets</button>
+        <button class="tab" role="tab" id="t-tune" aria-selected="false">Fine-tune</button>
+        <button class="tab" role="tab" id="t-export" aria-selected="false">Export</button>
+      </nav>
+
+      <div class="panes">
+        <!-- CROP -->
+        <div id="p-crop" class="stack">
+          <div>
+            <div class="lbl">Aspect</div>
+            <div class="row" id="ratios"></div>
+          </div>
+          <div>
+            <div class="lbl">Exact size</div>
+            <div class="row">
+              <input class="num sm" id="exW" type="number" min="0.05" step="any" placeholder="W" inputmode="decimal">
+              <span class="times">×</span>
+              <input class="num sm" id="exH" type="number" min="0.05" step="any" placeholder="H" inputmode="decimal">
+              <div class="seg" id="unitChips"></div>
+            </div>
+            <div class="row" id="dpiRow" style="margin-top:8px">
+              <span class="note">Resolution</span>
+              <input class="num sm" id="dpi" type="number" min="36" max="1200" step="1" value="300">
+              <span class="note">dpi</span>
+            </div>
+            <div class="row" style="margin-top:8px">
+              <button class="btn ghost" id="applyExact">Lock to size</button>
+              <button class="btn ghost" id="clearExact" hidden>Unlock</button>
+            </div>
+            <div class="row" style="margin-top:8px" id="printChips"></div>
+            <p class="note" id="exactNote">Lock the crop to a real size — 5 × 5 in at 300 dpi crops to that shape and exports at exactly 1500 × 1500 px.</p>
+          </div>
+          <div>
+            <div class="lbl">Orientation</div>
+            <div class="icons">
+              <button class="chip" id="rotL" title="Rotate left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9h11a5 5 0 0 1 0 10H8"/><path d="M7 5 3 9l4 4"/></svg></button>
+              <button class="chip" id="rotR" title="Rotate right"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 9H10a5 5 0 0 0 0 10h6"/><path d="m17 5 4 4-4 4"/></svg></button>
+              <button class="chip" id="flipH" title="Flip horizontal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M8 7 3 12l5 5z"/><path d="m16 7 5 5-5 5z"/></svg></button>
+              <button class="chip" id="flipV" title="Flip vertical"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18"/><path d="M7 8l5-5 5 5z"/><path d="M7 16l5 5 5-5z"/></svg></button>
+              <button class="chip" id="cropReset" title="Reset framing">Reset</button>
+            </div>
+          </div>
+          <div class="slider">
+            <span class="name">Straighten</span><span class="val" id="vAngle">0.0°</span>
+            <input type="range" id="sAngle" min="-15" max="15" step="0.1" value="0">
+          </div>
+          <p class="note">Drag inside the frame to move the crop, or grab an edge or corner to resize it. Straightening zooms to fill, so you never get blank corners.</p>
+        </div>
+
+        <!-- PRESETS -->
+        <div id="p-presets" class="stack" hidden>
+          <div>
+            <div class="lbl">Looks</div>
+            <div class="presets" id="presetGrid"></div>
+          </div>
+          <hr class="hr">
+          <div class="row">
+            <button class="btn ghost" id="savePreset">Save current as preset</button>
+            <button class="btn ghost" id="clearPresets" hidden>Clear mine</button>
+          </div>
+          <p class="note" id="presetNote">Your own presets are kept in this browser only.</p>
+        </div>
+
+        <!-- FINE-TUNE -->
+        <div id="p-tune" class="stack" hidden>
+          <div class="slider"><span class="name">Exposure</span><span class="val" id="vBri">0</span><input type="range" id="sBri" min="40" max="170" step="1" value="100"></div>
+          <div class="slider"><span class="name">Contrast</span><span class="val" id="vCon">0</span><input type="range" id="sCon" min="50" max="180" step="1" value="100"></div>
+          <div class="slider"><span class="name">Saturation</span><span class="val" id="vSat">0</span><input type="range" id="sSat" min="0" max="220" step="1" value="100"></div>
+          <div class="slider"><span class="name">Warmth</span><span class="val" id="vWarm">0</span><input type="range" id="sWarm" min="-100" max="100" step="1" value="0"></div>
+          <div class="slider"><span class="name">Fade</span><span class="val" id="vFade">0</span><input type="range" id="sFade" min="0" max="100" step="1" value="0"></div>
+          <div class="slider"><span class="name">Vignette</span><span class="val" id="vVig">0</span><input type="range" id="sVig" min="0" max="100" step="1" value="0"></div>
+          <div class="slider"><span class="name">Grain</span><span class="val" id="vGrain">0</span><input type="range" id="sGrain" min="0" max="100" step="1" value="0"></div>
+          <div class="row"><button class="btn ghost" id="tuneReset">Reset all</button></div>
+        </div>
+
+        <!-- EXPORT -->
+        <div id="p-export" class="stack" hidden>
+          <div id="longEdgeBlock">
+            <div class="lbl">Long edge</div>
+            <div class="row">
+              <input class="num" type="number" id="longEdge" min="64" max="6000" step="1" value="1600">
+              <span class="note">px</span>
+            </div>
+            <div class="row" style="margin-top:8px" id="sizeChips"></div>
+          </div>
+          <div id="exactOut" hidden>
+            <div class="lbl">Output size</div>
+            <p class="note" id="exactOutNote"></p>
+          </div>
+          <div>
+            <div class="lbl">File size</div>
+            <div class="row">
+              <button class="chip" id="targetToggle" aria-pressed="false">Fit to size</button>
+              <input class="num sm" id="targetVal" type="number" min="5" step="5" value="500" inputmode="numeric">
+              <div class="seg" id="targetUnit"></div>
+            </div>
+            <div class="row" style="margin-top:8px">
+              <button class="btn ghost" id="measureBtn">Measure current</button>
+            </div>
+            <p class="note" id="targetNote">Turn this on and the export drops quality — then resolution, if it must — until the file fits under your limit.</p>
+          </div>
+          <div>
+            <div class="lbl">Format</div>
+            <div class="row" id="fmtChips"></div>
+          </div>
+          <div class="slider" id="qualityWrap">
+            <span class="name">Quality</span><span class="val" id="vQ">90</span>
+            <input type="range" id="sQ" min="40" max="100" step="1" value="90">
+          </div>
+          <hr class="hr">
+          <div class="dims" id="outDims"></div>
+          <div class="row"><button class="btn key" id="exportBtn">Save image</button></div>
+          <div class="saved" id="savedMsg"></div>
+          <img id="shot" alt="Exported result">
+          <p class="note" id="exportNote"></p>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<input type="file" id="picker" accept="image/*" hidden>
+
+<script>
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id)};
+var view=$("view"), vctx=view.getContext("2d"), stage=$("stage"), app=$("app");
+var work=document.createElement("canvas"), wctx=work.getContext("2d");
+var DPR=Math.min(window.devicePixelRatio||1,2);
+
+var BASE={bri:100,con:100,sat:100,warm:0,fade:0,vig:0,grain:0};
+var S={
+  img:null, name:"sample-frame.jpg",
+  rot:0, flipH:false, flipV:false, angle:0,
+  crop:{x:0,y:0,w:1,h:1}, ratio:"free", exact:null,
+  adj:Object.assign({},BASE), preset:"none",
+  longEdge:1600, fmt:"jpeg", q:0.9,
+  target:{on:false,bytes:500*1024}
+};
+var CAP=8192;
+var tab="crop";
+
+/* ---------- noise tile for grain ---------- */
+var noise=(function(){
+  var n=document.createElement("canvas");n.width=n.height=128;
+  var c=n.getContext("2d"), d=c.createImageData(128,128), p=d.data;
+  for(var i=0;i<p.length;i+=4){var v=128+(Math.random()-0.5)*110;p[i]=p[i+1]=p[i+2]=v;p[i+3]=255}
+  c.putImageData(d,0,0);return n;
+})();
+
+/* ---------- sample frame, so the tool opens working ---------- */
+function sampleImage(){
+  var W=1600,H=1067,c=document.createElement("canvas");c.width=W;c.height=H;
+  var x=c.getContext("2d"),g=x.createLinearGradient(0,0,0,H*0.72);
+  g.addColorStop(0,"#1d3b4d");g.addColorStop(.45,"#4b6b74");g.addColorStop(.78,"#c58f5a");g.addColorStop(1,"#efc188");
+  x.fillStyle=g;x.fillRect(0,0,W,H*0.75);
+  x.fillStyle="rgba(255,238,205,.95)";x.beginPath();x.arc(W*0.68,H*0.52,52,0,7);x.fill();
+  x.fillStyle="rgba(255,226,180,.18)";x.beginPath();x.arc(W*0.68,H*0.52,140,0,7);x.fill();
+  var bands=[[0.66,"#5d6f70",26],[0.73,"#44585c",34],[0.80,"#2f4347",44]];
+  for(var b=0;b<bands.length;b++){
+    var base=H*bands[b][0];x.fillStyle=bands[b][1];x.beginPath();x.moveTo(0,H);
+    for(var px=0;px<=W;px+=8){
+      var y=base+Math.sin(px/(170+b*60)+b*2.1)*bands[b][2]+Math.sin(px/47+b)*7;
+      x.lineTo(px,y);
+    }
+    x.lineTo(W,H);x.closePath();x.fill();
+  }
+  x.fillStyle="#17282c";x.beginPath();x.moveTo(0,H);
+  for(var q=0;q<=W;q+=6){x.lineTo(q,H*0.88+Math.sin(q/90)*16+Math.sin(q/23)*5)}
+  x.lineTo(W,H);x.closePath();x.fill();
+  x.globalAlpha=.07;
+  for(var k=0;k<13;k++){x.drawImage(noise,(k%5)*320,Math.floor(k/5)*320,340,340)}
+  x.globalAlpha=1;
+  return c;
+}
+
+/* ---------- geometry ---------- */
+function oriented(){
+  var w=S.img.width,h=S.img.height;
+  return (S.rot%180===0)?{w:w,h:h}:{w:h,h:w};
+}
+function cropPxSize(){var o=oriented();return{w:Math.max(1,Math.round(o.w*S.crop.w)),h:Math.max(1,Math.round(o.h*S.crop.h))}}
+
+function paintBase(ctx,W,H){
+  var a=S.adj;
+  ctx.save();
+  ctx.fillStyle="#000";ctx.fillRect(0,0,W,H);
+  ctx.filter="brightness("+a.bri+"%) contrast("+a.con+"%) saturate("+a.sat+"%)";
+  ctx.translate(W/2,H/2);
+  var rad=S.angle*Math.PI/180;
+  if(rad){
+    var cs=Math.abs(Math.cos(rad)),sn=Math.abs(Math.sin(rad));
+    var s=Math.max((W*cs+H*sn)/W,(W*sn+H*cs)/H);
+    ctx.rotate(rad);ctx.scale(s,s);
+  }
+  ctx.rotate(S.rot*Math.PI/180);
+  ctx.scale(S.flipH?-1:1,S.flipV?-1:1);
+  var o=oriented(),k=W/o.w;
+  ctx.scale(k,k);
+  ctx.drawImage(S.img,-S.img.width/2,-S.img.height/2);
+  ctx.restore();
+  ctx.filter="none";
+
+  if(a.warm!==0){
+    ctx.save();ctx.globalCompositeOperation="soft-light";
+    ctx.globalAlpha=Math.min(.85,Math.abs(a.warm)/100*0.8);
+    ctx.fillStyle=a.warm>0?"#ff9b3d":"#4aa8ff";ctx.fillRect(0,0,W,H);ctx.restore();
+  }
+  if(a.fade>0){
+    ctx.save();ctx.globalCompositeOperation="lighten";
+    ctx.fillStyle="rgba(206,198,186,"+(a.fade/100*0.30)+")";ctx.fillRect(0,0,W,H);ctx.restore();
+  }
+}
+function paintFinish(ctx,W,H){
+  var a=S.adj;
+  if(a.vig>0){
+    var r=Math.sqrt(W*W+H*H)/2;
+    var g=ctx.createRadialGradient(W/2,H/2,r*0.38,W/2,H/2,r);
+    g.addColorStop(0,"rgba(0,0,0,0)");
+    g.addColorStop(1,"rgba(0,0,0,"+(a.vig/100*0.78)+")");
+    ctx.save();ctx.fillStyle=g;ctx.fillRect(0,0,W,H);ctx.restore();
+  }
+  if(a.grain>0){
+    ctx.save();ctx.globalCompositeOperation="overlay";
+    ctx.globalAlpha=a.grain/100*0.42;
+    var p=ctx.createPattern(noise,"repeat");
+    ctx.fillStyle=p;ctx.fillRect(0,0,W,H);ctx.restore();
+  }
+}
+
+/* ---------- preview ---------- */
+var pending=false;
+function render(){ if(pending)return; pending=true; requestAnimationFrame(function(){pending=false;draw()}) }
+
+function stageBox(){
+  var r=stage.getBoundingClientRect();
+  var padX=parseFloat(getComputedStyle(stage).paddingLeft)*2;
+  return {w:Math.max(80,r.width-padX), h:Math.max(80,r.height-34)};
+}
+function draw(){
+  if(!S.img)return;
+  var o=oriented(), cropMode=(tab==="crop");
+  var aw=cropMode?o.w:o.w*S.crop.w, ah=cropMode?o.h:o.h*S.crop.h;
+  var box=stageBox(), sc=Math.min(box.w/aw,box.h/ah);
+  var dw=Math.max(40,Math.round(aw*sc)), dh=Math.max(40,Math.round(ah*sc));
+
+  view.style.width=dw+"px";view.style.height=dh+"px";
+  view.width=Math.round(dw*DPR);view.height=Math.round(dh*DPR);
+
+  var fullW=Math.round((cropMode?dw:dw/S.crop.w)*DPR);
+  var fullH=Math.round((cropMode?dh:dh/S.crop.h)*DPR);
+  var lim=Math.min(1,CAP/Math.max(fullW,fullH));
+  fullW=Math.max(2,Math.round(fullW*lim));fullH=Math.max(2,Math.round(fullH*lim));
+  work.width=fullW;work.height=fullH;
+  paintBase(wctx,fullW,fullH);
+
+  vctx.setTransform(1,0,0,1,0,0);
+  vctx.imageSmoothingQuality="high";
+  if(cropMode){
+    vctx.drawImage(work,0,0);
+    paintFinish(vctx,view.width,view.height);
+    overlay(dw,dh);
+  }else{
+    vctx.drawImage(work,S.crop.x*fullW,S.crop.y*fullH,S.crop.w*fullW,S.crop.h*fullH,0,0,view.width,view.height);
+    paintFinish(vctx,view.width,view.height);
+  }
+  var cp=cropPxSize();
+  $("readout").textContent=cp.w+"×"+cp.h+"  ·  "+ratioLabel()+(S.angle?("  ·  "+S.angle.toFixed(1)+"°"):"");
+}
+function overlay(dw,dh){
+  var c=S.crop, x=c.x*dw*DPR, y=c.y*dh*DPR, w=c.w*dw*DPR, h=c.h*dh*DPR;
+  vctx.save();
+  vctx.fillStyle="rgba(10,8,7,.58)";
+  vctx.fillRect(0,0,view.width,y);
+  vctx.fillRect(0,y+h,view.width,view.height-(y+h));
+  vctx.fillRect(0,y,x,h);
+  vctx.fillRect(x+w,y,view.width-(x+w),h);
+  vctx.strokeStyle="rgba(239,233,225,.22)";vctx.lineWidth=1*DPR;
+  for(var i=1;i<3;i++){
+    vctx.beginPath();vctx.moveTo(x+w*i/3,y);vctx.lineTo(x+w*i/3,y+h);vctx.stroke();
+    vctx.beginPath();vctx.moveTo(x,y+h*i/3);vctx.lineTo(x+w,y+h*i/3);vctx.stroke();
+  }
+  vctx.strokeStyle="rgba(239,233,225,.85)";vctx.lineWidth=1*DPR;
+  vctx.strokeRect(x+0.5,y+0.5,w,h);
+  vctx.strokeStyle="#e3a455";vctx.lineWidth=3*DPR;vctx.lineCap="square";
+  var L=Math.min(22*DPR,w/3,h/3), cs=[[x,y,1,1],[x+w,y,-1,1],[x,y+h,1,-1],[x+w,y+h,-1,-1]];
+  for(var k=0;k<4;k++){
+    var p=cs[k];
+    vctx.beginPath();vctx.moveTo(p[0],p[1]+p[3]*L);vctx.lineTo(p[0],p[1]);vctx.lineTo(p[0]+p[2]*L,p[1]);vctx.stroke();
+  }
+  vctx.restore();
+}
+
+/* ---------- crop interaction ---------- */
+var drag=null;
+function hit(px,py,dw,dh){
+  var c=S.crop,x=c.x*dw,y=c.y*dh,w=c.w*dw,h=c.h*dh,t=Math.max(14,Math.min(26,Math.min(w,h)/3));
+  var nearL=Math.abs(px-x)<t, nearR=Math.abs(px-(x+w))<t,
+      nearT=Math.abs(py-y)<t, nearB=Math.abs(py-(y+h))<t,
+      inX=px>x-t&&px<x+w+t, inY=py>y-t&&py<y+h+t;
+  if(!inX||!inY)return null;
+  if(nearL&&nearT)return"nw"; if(nearR&&nearT)return"ne";
+  if(nearL&&nearB)return"sw"; if(nearR&&nearB)return"se";
+  if(nearL)return"w"; if(nearR)return"e"; if(nearT)return"n"; if(nearB)return"s";
+  if(px>x&&px<x+w&&py>y&&py<y+h)return"move";
+  return null;
+}
+view.addEventListener("pointerdown",function(e){
+  if(tab!=="crop"||!S.img)return;
+  var r=view.getBoundingClientRect(), h=hit(e.clientX-r.left,e.clientY-r.top,r.width,r.height);
+  if(!h)return;
+  drag={mode:h,sx:e.clientX,sy:e.clientY,w:r.width,h:r.height,start:Object.assign({},S.crop)};
+  view.setPointerCapture(e.pointerId);e.preventDefault();
+});
+view.addEventListener("pointermove",function(e){
+  if(!drag){
+    if(tab==="crop"&&S.img){
+      var r0=view.getBoundingClientRect(),hh=hit(e.clientX-r0.left,e.clientY-r0.top,r0.width,r0.height);
+      var map={nw:"nwse-resize",se:"nwse-resize",ne:"nesw-resize",sw:"nesw-resize",n:"ns-resize",s:"ns-resize",e:"ew-resize",w:"ew-resize",move:"move"};
+      view.style.cursor=hh?map[hh]:"crosshair";
+    }
+    return;
+  }
+  var dx=(e.clientX-drag.sx)/drag.w, dy=(e.clientY-drag.sy)/drag.h, s=drag.start, m=drag.mode;
+  var x=s.x,y=s.y,w=s.w,h=s.h,MIN=0.06;
+  if(m==="move"){
+    x=Math.min(1-w,Math.max(0,s.x+dx)); y=Math.min(1-h,Math.max(0,s.y+dy));
+  }else{
+    if(m.indexOf("w")>-1){var nx=Math.min(s.x+s.w-MIN,Math.max(0,s.x+dx));w=s.x+s.w-nx;x=nx}
+    if(m.indexOf("e")>-1){w=Math.min(1-s.x,Math.max(MIN,s.w+dx))}
+    if(m.indexOf("n")>-1){var ny=Math.min(s.y+s.h-MIN,Math.max(0,s.y+dy));h=s.y+s.h-ny;y=ny}
+    if(m.indexOf("s")>-1){h=Math.min(1-s.y,Math.max(MIN,s.h+dy))}
+    var R=ratioValue();
+    if(R){
+      var o=oriented(), anchorR=(m.indexOf("w")>-1), anchorB=(m.indexOf("n")>-1);
+      if(m==="n"||m==="s"){ w=h*o.h*R/o.w; if(w>1){w=1;h=w*o.w/(R*o.h)} x=Math.min(1-w,Math.max(0,s.x+(s.w-w)/2)); }
+      else { h=w*o.w/(R*o.h); if(h>1){h=1;w=h*o.h*R/o.w}
+             if(m==="e"||m==="w"){ y=Math.min(1-h,Math.max(0,s.y+(s.h-h)/2)); }
+             else if(anchorB){ y=s.y+s.h-h; } }
+      if(anchorR)x=s.x+s.w-w;
+      if(x<0){w+=x;h=w*o.w/(R*o.h);x=0} if(y<0){h+=y;w=h*o.h*R/o.w;y=0}
+      if(x+w>1){w=1-x;h=w*o.w/(R*o.h)} if(y+h>1){h=1-y;w=h*o.h*R/o.w}
+    }
+  }
+  S.crop={x:x,y:y,w:Math.max(MIN,w),h:Math.max(MIN,h)};
+  render();updateDims();
+});
+function endDrag(){drag=null}
+view.addEventListener("pointerup",endDrag);
+view.addEventListener("pointercancel",endDrag);
+
+/* ---------- ratios ---------- */
+var RATIOS=[["free","Free",null],["orig","Original",0],["1:1","1:1",1],["4:5","4:5",4/5],["5:4","5:4",5/4],["3:2","3:2",3/2],["2:3","2:3",2/3],["16:9","16:9",16/9]];
+function ratioValue(){
+  if(S.exact)return S.exact.w/S.exact.h;
+  var r=RATIOS.filter(function(a){return a[0]===S.ratio})[0];
+  if(!r||r[2]===null)return null;
+  if(r[2]===0){var o=oriented();return o.w/o.h}
+  return r[2];
+}
+function ratioLabel(){
+  if(S.exact)return S.exact.label;
+  var r=RATIOS.filter(function(a){return a[0]===S.ratio})[0];return r?r[1]:"Free";
+}
+function fitRatio(){
+  var R=ratioValue(); if(!R)return;
+  var o=oriented(), c=S.crop;
+  var cx=c.x+c.w/2, cy=c.y+c.h/2;
+  var w=c.w, h=w*o.w/(R*o.h);
+  if(h>Math.min(1,c.h*1.6)){h=Math.min(1,c.h);w=h*o.h*R/o.w}
+  if(w>1){w=1;h=w*o.w/(R*o.h)}
+  if(h>1){h=1;w=h*o.h*R/o.w}
+  S.crop={w:w,h:h,x:Math.min(1-w,Math.max(0,cx-w/2)),y:Math.min(1-h,Math.max(0,cy-h/2))};
+}
+(function(){
+  var box=$("ratios");
+  RATIOS.forEach(function(r){
+    var b=document.createElement("button");
+    b.className="chip";b.textContent=r[1];b.setAttribute("aria-pressed",S.ratio===r[0]);
+    b.onclick=function(){
+      S.ratio=r[0];clearExact(true);
+      Array.prototype.forEach.call(box.children,function(ch){ch.setAttribute("aria-pressed",ch===b)});
+      fitRatio();render();updateDims();
+    };
+    box.appendChild(b);
+  });
+})();
+
+/* ---------- exact size ---------- */
+var exUnit="in";
+var PRINTS=[
+  ["4 × 6 in",4,6,"in"],["5 × 5 in",5,5,"in"],["5 × 7 in",5,7,"in"],["8 × 10 in",8,10,"in"],
+  ["A4",8.27,11.69,"in"],["1080 px²",1080,1080,"px"],["1920 × 1080",1920,1080,"px"]
+];
+(function(){
+  var ub=$("unitChips");
+  [["in","in"],["cm","cm"],["px","px"]].forEach(function(u){
+    var b=document.createElement("button");
+    b.className="chip";b.textContent=u[1];b.setAttribute("aria-pressed",exUnit===u[0]);
+    b.onclick=function(){
+      exUnit=u[0];
+      Array.prototype.forEach.call(ub.children,function(ch){ch.setAttribute("aria-pressed",ch===b)});
+      $("dpiRow").hidden=(exUnit==="px");
+    };
+    ub.appendChild(b);
+  });
+  var pb=$("printChips");
+  PRINTS.forEach(function(p){
+    var b=document.createElement("button");
+    b.className="chip";b.textContent=p[0];
+    b.onclick=function(){
+      exUnit=p[3];
+      Array.prototype.forEach.call($("unitChips").children,function(ch){
+        ch.setAttribute("aria-pressed",ch.textContent===p[3]);
+      });
+      $("dpiRow").hidden=(exUnit==="px");
+      $("exW").value=p[1];$("exH").value=p[2];
+      applyExact();
+    };
+    pb.appendChild(b);
+  });
+})();
+function toPx(v,unit,dpi){
+  if(unit==="px")return Math.round(v);
+  if(unit==="in")return Math.round(v*dpi);
+  return Math.round(v/2.54*dpi);
+}
+function applyExact(){
+  var w=parseFloat($("exW").value), h=parseFloat($("exH").value);
+  if(!(w>0)||!(h>0)){$("exactNote").textContent="Enter a width and a height first.";return}
+  var dpi=Math.max(36,Math.min(1200,parseInt($("dpi").value,10)||300));
+  var pw=Math.min(12000,Math.max(16,toPx(w,exUnit,dpi)));
+  var ph=Math.min(12000,Math.max(16,toPx(h,exUnit,dpi)));
+  var label=(exUnit==="px")?(pw+" × "+ph+" px"):(trim(w)+" × "+trim(h)+" "+exUnit+" @ "+dpi+" dpi");
+  S.exact={w:pw,h:ph,label:label};S.ratio="exact";
+  Array.prototype.forEach.call($("ratios").children,function(ch){ch.setAttribute("aria-pressed",false)});
+  fitRatio();
+  $("clearExact").hidden=false;
+  $("exactNote").textContent="Crop locked to "+label+(exUnit==="px"?"":" — exports at "+pw+" × "+ph+" px")+".";
+  syncExportMode();render();updateDims();
+}
+function trim(n){return (Math.round(n*100)/100).toString()}
+function clearExact(quiet){
+  if(!S.exact&&quiet)return;
+  S.exact=null;
+  $("clearExact").hidden=true;
+  $("exactNote").textContent="Lock the crop to a real size — 5 × 5 in at 300 dpi crops to that shape and exports at exactly 1500 × 1500 px.";
+  if(!quiet){
+    S.ratio="free";
+    Array.prototype.forEach.call($("ratios").children,function(ch,i){ch.setAttribute("aria-pressed",i===0)});
+  }
+  syncExportMode();render();updateDims();
+}
+$("applyExact").onclick=applyExact;
+$("clearExact").onclick=function(){clearExact(false)};
+function syncExportMode(){
+  $("longEdgeBlock").hidden=!!S.exact;
+  $("exactOut").hidden=!S.exact;
+  if(S.exact)$("exactOutNote").textContent="Set by the crop lock: "+S.exact.w+" × "+S.exact.h+" px ("+S.exact.label+"). Unlock it in Crop to size by long edge instead.";
+}
+
+/* ---------- orientation ---------- */
+function rotCrop(dir){
+  var c=S.crop;
+  S.crop = dir>0 ? {x:1-c.y-c.h, y:c.x, w:c.h, h:c.w} : {x:c.y, y:1-c.x-c.w, w:c.h, h:c.w};
+  S.rot=(S.rot+(dir>0?90:270))%360;
+  if(S.ratio!=="free")fitRatio();
+  render();updateDims();
+}
+$("rotL").onclick=function(){rotCrop(-1)};
+$("rotR").onclick=function(){rotCrop(1)};
+$("flipH").onclick=function(){S.flipH=!S.flipH;S.crop.x=1-S.crop.x-S.crop.w;render()};
+$("flipV").onclick=function(){S.flipV=!S.flipV;S.crop.y=1-S.crop.y-S.crop.h;render()};
+$("cropReset").onclick=function(){
+  S.rot=0;S.flipH=S.flipV=false;S.angle=0;S.crop={x:0,y:0,w:1,h:1};S.ratio="free";
+  $("sAngle").value=0;$("vAngle").textContent="0.0°";
+  clearExact(false);
+};
+$("sAngle").addEventListener("input",function(){
+  S.angle=parseFloat(this.value);$("vAngle").textContent=S.angle.toFixed(1)+"°";render();
+});
+
+/* ---------- fine-tune ---------- */
+var TUNE=[["Bri","bri",100],["Con","con",100],["Sat","sat",100],["Warm","warm",0],["Fade","fade",0],["Vig","vig",0],["Grain","grain",0]];
+TUNE.forEach(function(t){
+  var el=$("s"+t[0]);
+  el.addEventListener("input",function(){
+    S.adj[t[1]]=parseFloat(this.value);
+    markCustom();syncTune();render();
+  });
+});
+function syncTune(){
+  TUNE.forEach(function(t){
+    var v=S.adj[t[1]];$("s"+t[0]).value=v;
+    $("v"+t[0]).textContent=(t[2]===100)?((v-100>0?"+":"")+Math.round(v-100)):Math.round(v);
+  });
+}
+
+/* ---------- presets ---------- */
+var BUILTIN=[
+  {id:"none",name:"As shot",adj:{}},
+  {id:"safelight",name:"Safelight",adj:{bri:104,con:112,sat:108,warm:38,fade:10,vig:18,grain:8}},
+  {id:"graphite",name:"Graphite",adj:{bri:102,con:132,sat:0,warm:0,fade:4,vig:24,grain:16}},
+  {id:"mineral",name:"Mineral",adj:{bri:100,con:106,sat:78,warm:-34,fade:12,vig:10,grain:0}},
+  {id:"bloom",name:"Bloom",adj:{bri:116,con:92,sat:112,warm:16,fade:26,vig:0,grain:0}},
+  {id:"oxide",name:"Oxide",adj:{bri:96,con:124,sat:88,warm:30,fade:0,vig:34,grain:26}},
+  {id:"flatline",name:"Flatline",adj:{bri:104,con:80,sat:92,warm:4,fade:30,vig:0,grain:6}},
+  {id:"noon",name:"Noon",adj:{bri:102,con:126,sat:134,warm:-8,fade:0,vig:12,grain:0}}
+];
+var mine=[];
+try{ var raw=localStorage.getItem("darkroom.presets"); if(raw)mine=JSON.parse(raw)||[] }catch(e){ mine=[] }
+function savePresets(){ try{localStorage.setItem("darkroom.presets",JSON.stringify(mine))}catch(e){} }
+function allPresets(){return BUILTIN.concat(mine)}
+
+function applyPreset(p){
+  S.adj=Object.assign({},BASE,p.adj);S.preset=p.id;syncTune();
+  Array.prototype.forEach.call($("presetGrid").children,function(el){
+    el.setAttribute("aria-pressed",el.dataset.id===p.id);
+  });
+  render();
+}
+function markCustom(){
+  S.preset="custom";
+  Array.prototype.forEach.call($("presetGrid").children,function(el){el.setAttribute("aria-pressed",false)});
+}
+function buildPresets(){
+  var grid=$("presetGrid");grid.textContent="";
+  allPresets().forEach(function(p){
+    var b=document.createElement("button");
+    b.className="pset";b.dataset.id=p.id;b.setAttribute("aria-pressed",S.preset===p.id);
+    var c=document.createElement("canvas");c.width=180;c.height=116;
+    var s=document.createElement("span");s.textContent=p.name;
+    b.appendChild(c);b.appendChild(s);
+    b.onclick=function(){applyPreset(p)};
+    grid.appendChild(b);
+    thumb(c,p);
+  });
+  $("clearPresets").hidden = mine.length===0;
+  $("presetNote").textContent = mine.length
+    ? mine.length+" of your own presets, kept in this browser only."
+    : "Your own presets are kept in this browser only.";
+}
+var thumbSrc=null;
+function makeThumbSrc(){
+  if(!S.img)return null;
+  var t=document.createElement("canvas"),W=180,H=116;t.width=W;t.height=H;
+  var c=t.getContext("2d"),iw=S.img.width,ih=S.img.height;
+  var k=Math.max(W/iw,H/ih),dw=iw*k,dh=ih*k;
+  c.drawImage(S.img,(W-dw)/2,(H-dh)/2,dw,dh);
+  thumbSrc=t;return t;
+}
+function thumb(canvas,p){
+  if(!thumbSrc)return;
+  var c=canvas.getContext("2d"),a=Object.assign({},BASE,p.adj),W=canvas.width,H=canvas.height;
+  c.clearRect(0,0,W,H);
+  c.filter="brightness("+a.bri+"%) contrast("+a.con+"%) saturate("+a.sat+"%)";
+  c.drawImage(thumbSrc,0,0);c.filter="none";
+  if(a.warm){c.save();c.globalCompositeOperation="soft-light";c.globalAlpha=Math.abs(a.warm)/100*0.8;c.fillStyle=a.warm>0?"#ff9b3d":"#4aa8ff";c.fillRect(0,0,W,H);c.restore()}
+  if(a.fade){c.save();c.globalCompositeOperation="lighten";c.fillStyle="rgba(206,198,186,"+(a.fade/100*0.3)+")";c.fillRect(0,0,W,H);c.restore()}
+  if(a.vig){var r=Math.sqrt(W*W+H*H)/2,g=c.createRadialGradient(W/2,H/2,r*.38,W/2,H/2,r);
+    g.addColorStop(0,"rgba(0,0,0,0)");g.addColorStop(1,"rgba(0,0,0,"+(a.vig/100*.78)+")");c.fillStyle=g;c.fillRect(0,0,W,H)}
+  if(a.grain){c.save();c.globalCompositeOperation="overlay";c.globalAlpha=a.grain/100*.42;c.fillStyle=c.createPattern(noise,"repeat");c.fillRect(0,0,W,H);c.restore()}
+}
+function refreshThumbs(){
+  makeThumbSrc();
+  var kids=$("presetGrid").children, list=allPresets();
+  for(var i=0;i<kids.length;i++)thumb(kids[i].querySelector("canvas"),list[i]);
+}
+$("savePreset").onclick=function(){
+  var n=1,name;
+  do{ name="Mine "+n; n++ }while(allPresets().some(function(p){return p.name===name}));
+  mine.push({id:"u"+Date.now(),name:name,adj:Object.assign({},S.adj)});
+  savePresets();buildPresets();refreshThumbs();
+  applyPreset(mine[mine.length-1]);
+};
+$("clearPresets").onclick=function(){ mine=[];savePresets();buildPresets();refreshThumbs() };
+$("tuneReset").onclick=function(){ applyPreset(BUILTIN[0]) };
+
+/* ---------- export ---------- */
+var SIZES=[800,1200,1600,2048,"Original"];
+(function(){
+  var box=$("sizeChips");
+  SIZES.forEach(function(v){
+    var b=document.createElement("button");b.className="chip";b.textContent=(v==="Original")?"Original":v;
+    b.onclick=function(){
+      var cp=cropPxSize();
+      S.longEdge=(v==="Original")?Math.max(cp.w,cp.h):v;
+      $("longEdge").value=S.longEdge;updateDims();
+    };
+    box.appendChild(b);
+  });
+  var fb=$("fmtChips");
+  [["jpeg","JPEG"],["png","PNG"],["webp","WebP"]].forEach(function(f){
+    var b=document.createElement("button");b.className="chip";b.textContent=f[1];
+    b.setAttribute("aria-pressed",S.fmt===f[0]);
+    b.onclick=function(){
+      S.fmt=f[0];
+      Array.prototype.forEach.call(fb.children,function(ch){ch.setAttribute("aria-pressed",ch===b)});
+      $("qualityWrap").hidden=(f[0]==="png");updateDims();syncTargetNote();
+    };
+    fb.appendChild(b);
+  });
+})();
+$("longEdge").addEventListener("input",function(){
+  var v=parseInt(this.value,10);if(v>0)S.longEdge=Math.min(6000,Math.max(64,v));updateDims();
+});
+$("sQ").addEventListener("input",function(){S.q=parseInt(this.value,10)/100;$("vQ").textContent=this.value});
+
+/* target file size */
+var tUnit="KB";
+(function(){
+  var tb=$("targetUnit");
+  ["KB","MB"].forEach(function(u){
+    var b=document.createElement("button");
+    b.className="chip";b.textContent=u;b.setAttribute("aria-pressed",tUnit===u);
+    b.onclick=function(){
+      tUnit=u;
+      Array.prototype.forEach.call(tb.children,function(ch){ch.setAttribute("aria-pressed",ch===b)});
+      if(u==="MB"&&parseFloat($("targetVal").value)>20)$("targetVal").value=2;
+      if(u==="KB"&&parseFloat($("targetVal").value)<20)$("targetVal").value=500;
+      readTarget();
+    };
+    tb.appendChild(b);
+  });
+})();
+function readTarget(){
+  var v=parseFloat($("targetVal").value)||0;
+  S.target.bytes=Math.max(5120,Math.round(v*(tUnit==="MB"?1048576:1024)));
+  syncTargetNote();
+}
+$("targetVal").addEventListener("input",readTarget);
+$("targetToggle").onclick=function(){
+  S.target.on=!S.target.on;
+  this.setAttribute("aria-pressed",S.target.on);
+  syncTargetNote();
+};
+function syncTargetNote(){
+  var el=$("targetNote");
+  if(!S.target.on){
+    el.textContent="Turn this on and the export drops quality — then resolution, if it must — until the file fits under your limit.";
+  }else if(S.fmt==="png"){
+    el.textContent="Aiming under "+fmtBytes(S.target.bytes)+". PNG has no quality dial, so only resolution can come down — JPEG or WebP will hold detail far better at a size limit.";
+  }else{
+    el.textContent="Aiming under "+fmtBytes(S.target.bytes)+". Quality comes down first; resolution only if quality alone can't get there.";
+  }
+}
+function outSize(){
+  var cp=cropPxSize();
+  if(S.exact)return {w:S.exact.w,h:S.exact.h,up:S.exact.w>cp.w*1.02};
+  var k=S.longEdge/Math.max(cp.w,cp.h);
+  return {w:Math.max(1,Math.round(cp.w*k)),h:Math.max(1,Math.round(cp.h*k)),up:k>1.02};
+}
+function updateDims(){
+  var cp=cropPxSize(),o=outSize();
+  $("outDims").innerHTML="Crop "+cp.w+"×"+cp.h+" px → <b>"+o.w+"×"+o.h+" px</b> · "+S.fmt.toUpperCase()
+    +(S.exact?" · "+S.exact.label:"")
+    +(o.up?' <span style="color:var(--warn)">(upscaling)</span>':"");
+}
+function renderOut(scale){
+  scale=scale||1;
+  var os=outSize();
+  var ow=Math.max(1,Math.round(os.w*scale)), oh=Math.max(1,Math.round(os.h*scale));
+  var fullW=Math.max(2,Math.round(ow/S.crop.w)), fullH=Math.max(2,Math.round(oh/S.crop.h));
+  var lim=Math.min(1,CAP/Math.max(fullW,fullH));
+  fullW=Math.max(2,Math.round(fullW*lim));fullH=Math.max(2,Math.round(fullH*lim));
+  var big=document.createElement("canvas");big.width=fullW;big.height=fullH;
+  paintBase(big.getContext("2d"),fullW,fullH);
+  var out=document.createElement("canvas");out.width=ow;out.height=oh;
+  var c=out.getContext("2d");c.imageSmoothingQuality="high";
+  c.drawImage(big,S.crop.x*fullW,S.crop.y*fullH,S.crop.w*fullW,S.crop.h*fullH,0,0,ow,oh);
+  paintFinish(c,ow,oh);
+  return out;
+}
+function baseName(){
+  var n=S.name.replace(/\.[^.]+$/,"")||"photo";
+  return n.slice(0,60)+"-edit."+(S.fmt==="jpeg"?"jpg":S.fmt);
+}
+var downloads=null,dlChecked=false;
+function note(msg,bad){var el=$("savedMsg");el.textContent=msg||"";el.className="saved"+(bad?" bad":"")}
+function encode(canvas,type,q){
+  return new Promise(function(res){canvas.toBlob(function(b){res(b)},type,q)});
+}
+function fmtBytes(n){return n>=1048576?(n/1048576).toFixed(2)+" MB":Math.max(1,Math.round(n/1024))+" KB"}
+
+/* Squeeze under a byte budget: drop quality first, then resolution. */
+function fitToTarget(type,target){
+  var steps=[1,0.85,0.7,0.55,0.42,0.3], i=0;
+  function attempt(){
+    var c=renderOut(steps[i]), last=(i===steps.length-1);
+    var pack=function(b,q,miss){return{blob:b,q:q,w:c.width,h:c.height,scaled:steps[i]<1,miss:!!miss}};
+    if(type==="image/png"){
+      return encode(c,type).then(function(b){
+        if(!b||b.size<=target||last)return pack(b,null,b&&b.size>target);
+        i++;return attempt();
+      });
+    }
+    var lo=0.2,hi=0.95,best=null,bq=0.2,n=0;
+    function bisect(){
+      var mid=(lo+hi)/2;
+      return encode(c,type,mid).then(function(b){
+        if(b&&b.size<=target){best=b;bq=mid;lo=mid}else{hi=mid}
+        n++;
+        if(n<7)return bisect();
+        if(best)return pack(best,bq);
+        if(last)return encode(c,type,0.2).then(function(bb){return pack(bb,0.2,true)});
+        i++;return attempt();
+      });
+    }
+    return encode(c,type,hi).then(function(b){
+      if(b&&b.size<=target)return pack(b,hi);
+      return bisect();
+    });
+  }
+  return attempt();
+}
+function build(){
+  var type="image/"+S.fmt;
+  if(S.target.on)return fitToTarget(type,S.target.bytes);
+  var c=renderOut(1);
+  return encode(c,type,S.fmt==="png"?undefined:S.q).then(function(b){
+    return {blob:b,q:S.fmt==="png"?null:S.q,w:c.width,h:c.height,scaled:false,miss:false};
+  });
+}
+function describe(r){
+  var d=r.w+"×"+r.h+" · "+fmtBytes(r.blob.size);
+  if(r.q!=null)d+=" · q"+Math.round(r.q*100);
+  if(r.scaled)d+=" · scaled down to fit";
+  return d;
+}
+function doExport(){
+  if(!S.img)return;
+  note("Rendering…");
+  build().then(function(r){
+    if(!r.blob){note("This browser can't encode "+S.fmt.toUpperCase()+". Try JPEG.",true);return}
+    if(r.miss)note("Couldn't get under "+fmtBytes(S.target.bytes)+" — this is the smallest it goes.",true);
+    deliver(r.blob,describe(r));
+  }).catch(function(){note("Something went wrong rendering that export.",true)});
+}
+/* Two save paths: the claude.ai artifact capability when present, a plain
+   anchor download when the page is hosted normally. The rendered image is
+   always shown as a visible fallback, so no environment leaves you empty-handed. */
+function anchorSave(blob){
+  try{
+    var url=URL.createObjectURL(blob), a=document.createElement("a");
+    a.href=url;a.download=baseName();a.rel="noopener";
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(function(){URL.revokeObjectURL(url)},10000);
+    return true;
+  }catch(e){return false}
+}
+function deliver(blob,detail){
+  if(downloads){
+    downloads.save({filename:baseName(),data:blob}).then(function(){
+      note("Saved "+baseName()+" · "+detail);
+    }).catch(function(err){
+      var c=err&&err.code;
+      if(c==="declined"){note("Save cancelled.")}
+      else if(c==="rate_limited"){note("A save prompt is already open — try again in a moment.",true)}
+      else{note("Save unavailable here — full-size result is below; press and hold it to keep it.",true);showShot(blob)}
+    });
+  }else{
+    anchorSave(blob);
+    note("Exported "+baseName()+" · "+detail+". If your browser didn't save it, use the full-size copy below.");
+    showShot(blob);
+  }
+}
+$("measureBtn").onclick=function(){
+  if(!S.img)return;
+  note("Measuring…");
+  build().then(function(r){
+    if(!r.blob){note("This browser can't encode "+S.fmt.toUpperCase()+".",true);return}
+    note("That export would be "+describe(r)+".");
+  });
+};
+var shotUrl=null;
+function showShot(blob){
+  if(shotUrl)URL.revokeObjectURL(shotUrl);
+  shotUrl=URL.createObjectURL(blob);
+  var im=$("shot");im.src=shotUrl;im.classList.add("on");
+}
+$("exportBtn").onclick=doExport;
+$("quickExport").onclick=function(){setTab("export");doExport()};
+
+/* ---------- tabs ---------- */
+var TABS=[["crop","p-crop"],["presets","p-presets"],["tune","p-tune"],["export","p-export"]];
+function setTab(id){
+  tab=id;
+  TABS.forEach(function(t){
+    $("t"+"-"+t[0]).setAttribute("aria-selected",t[0]===id);
+    $(t[1]).hidden=(t[0]!==id);
+  });
+  stage.classList.toggle("cropping",id==="crop");
+  if(id==="presets")refreshThumbs();
+  if(id==="export")updateDims();
+  render();
+}
+TABS.forEach(function(t){ $("t-"+t[0]).onclick=function(){setTab(t[0])} });
+
+/* ---------- loading images ---------- */
+function setImage(src,name){
+  S.img=src;S.name=name||"photo.jpg";
+  S.rot=0;S.flipH=S.flipV=false;S.angle=0;S.crop={x:0,y:0,w:1,h:1};
+  $("sAngle").value=0;$("vAngle").textContent="0.0°";
+  if(S.exact){fitRatio()}
+  else{
+    S.ratio="free";
+    Array.prototype.forEach.call($("ratios").children,function(ch,i){ch.setAttribute("aria-pressed",i===0)});
+  }
+  $("fileName").textContent=S.name+" · "+src.width+"×"+src.height;
+  S.longEdge=Math.min(2048,Math.max(src.width,src.height));
+  $("longEdge").value=S.longEdge;
+  $("shot").classList.remove("on");note("");
+  refreshThumbs();render();updateDims();
+}
+function loadFile(file){
+  if(!file||!/^image\//.test(file.type))return;
+  var done=function(bmp){setImage(bmp,file.name)};
+  if(window.createImageBitmap){
+    createImageBitmap(file,{imageOrientation:"from-image"}).then(done).catch(function(){legacy(file,done)});
+  }else legacy(file,done);
+}
+function legacy(file,done){
+  var url=URL.createObjectURL(file),im=new Image();
+  im.onload=function(){done(im)};
+  im.onerror=function(){note("That file could not be opened.",true)};
+  im.src=url;
+}
+$("openBtn").onclick=function(){$("picker").click()};
+$("picker").addEventListener("change",function(){ if(this.files&&this.files[0])loadFile(this.files[0]) });
+["dragenter","dragover"].forEach(function(ev){
+  document.addEventListener(ev,function(e){e.preventDefault();app.classList.add("dragging")});
+});
+["dragleave","drop"].forEach(function(ev){
+  document.addEventListener(ev,function(e){
+    e.preventDefault();
+    if(ev==="drop"||e.relatedTarget===null)app.classList.remove("dragging");
+    if(ev==="drop"&&e.dataTransfer&&e.dataTransfer.files[0])loadFile(e.dataTransfer.files[0]);
+  });
+});
+document.addEventListener("paste",function(e){
+  var items=e.clipboardData&&e.clipboardData.files;
+  if(items&&items[0])loadFile(items[0]);
+});
+window.addEventListener("resize",render);
+
+/* ---------- boot ---------- */
+syncTune();buildPresets();readTarget();syncExportMode();
+setImage(sampleImage(),"sample-frame.jpg");
+setTab("crop");
+$("exportNote").textContent="Everything runs in this page — your photo is never uploaded anywhere.";
+if(window.claude&&window.claude.use){
+  window.claude.use("downloads").then(function(d){
+    downloads=d;dlChecked=true;
+  }).catch(function(){});
+}
+})();
+</script>
+
+</body>
+</html>
